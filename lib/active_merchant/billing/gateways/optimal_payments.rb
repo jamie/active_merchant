@@ -217,16 +217,16 @@ module ActiveMerchant #:nodoc:
           addr = opts[:billing_address]
           xml.tag! 'cardPayMethod', 'WEB'
           if addr[:name]
-            xml.tag! 'firstName'    , addr[:name].split(' ').first
-            xml.tag! 'lastName'     , addr[:name].split(' ').last # TODO: parse properly
+            xml.tag! 'firstName', addr[:name].split(' ').first
+            xml.tag! 'lastName' , addr[:name].split(' ').last # TODO: parse properly
           end
-          xml.tag! 'street'       , addr[:address1] if addr[:address1]
-          xml.tag! 'street2'      , addr[:address2] if addr[:address2]
-          xml.tag! 'city'         , addr[:city]     if addr[:city]
-          xml.tag! 'state'        , addr[:state]    if addr[:state]
-          xml.tag! 'country'      , addr[:country]  if addr[:country]
-          xml.tag! 'zip'          , addr[:zip]      # this one's actually required
-          xml.tag! 'phone'        , addr[:phone]    if addr[:phone]
+          xml.tag! 'street' , addr[:address1] if addr[:address1] && !addr[:address1].empty?
+          xml.tag! 'street2', addr[:address2] if addr[:address2] && !addr[:address2].empty?
+          xml.tag! 'city'   , addr[:city]     if addr[:city]     && !addr[:city].empty?
+          xml.tag! 'state'  , addr[:state]    if addr[:state]    && !addr[:state].empty?
+          xml.tag! 'country', addr[:country]  if addr[:country]  && !addr[:country].empty?
+          xml.tag! 'zip'    , addr[:zip]      # this one's actually required
+          xml.tag! 'phone'  , addr[:phone]    if addr[:phone]    && !addr[:phone].empty?
           #xml.tag! 'email'        , ''
         end
       end
