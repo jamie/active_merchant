@@ -1,5 +1,9 @@
 require File.dirname(__FILE__) + '/../../test_helper'
 
+class ActiveMerchant::Billing::OptimalPaymentGateway
+  public :cc_auth_request
+end
+
 class OptimalPaymentTest < Test::Unit::TestCase
   def setup
     @gateway = OptimalPaymentGateway.new(
@@ -15,6 +19,31 @@ class OptimalPaymentTest < Test::Unit::TestCase
       :billing_address => address,
       :description => 'Store Purchase'
     }
+  end
+
+  def test_full_request
+    @gateway.instance_variable_set('@credit_card', @credit_card)
+    assert_equal full_request, @gateway.cc_auth_request(@amount, @options)
+  end
+
+  def test_minimal_request
+    options = {
+      :order_id => '1',
+      :description => 'Store Purchase',
+      :billing_address => {
+        :zip      => 'K1C2N6',
+      }
+    }
+    credit_card = CreditCard.new(
+      :number => '4242424242424242',
+      :month => 9,
+      :year => Time.now.year + 1,
+      :first_name => 'Longbob',
+      :last_name => 'Longsen',
+      :type => 'visa'
+    )
+    @gateway.instance_variable_set('@credit_card', credit_card)
+    assert_equal minimal_request, @gateway.cc_auth_request(@amount, options)
   end
 
   def test_successful_purchase
@@ -38,6 +67,68 @@ class OptimalPaymentTest < Test::Unit::TestCase
   end
 
   private
+
+  def full_request
+    <<-XML
+<ccAuthRequestV1 xsi:schemaLocation="http://www.optimalpayments.com/creditcard/xmlschema/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.optimalpayments.com/creditcard/xmlschema/v1">
+  <merchantAccount>
+    <accountNum></accountNum>
+    <storeID>login</storeID>
+    <storePwd>password</storePwd>
+  </merchantAccount>
+  <merchantRefNum>order_id</merchantRefNum>
+  <amount>1.0</amount>
+  <card>
+    <cardNum>4242424242424242</cardNum>
+    <cardExpiry>
+      <month>9</month>
+      <year>2010</year>
+    </cardExpiry>
+    <cardType>VI</cardType>
+    <cvdIndicator>1</cvdIndicator>
+    <cvd>123</cvd>
+  </card>
+  <billingDetails>
+    <cardPayMethod>WEB</cardPayMethod>
+    <firstName>Jim</firstName>
+    <lastName>Smith</lastName>
+    <street>1234 My Street</street>
+    <street2>Apt 1</street2>
+    <city>Ottawa</city>
+    <state>ON</state>
+    <country>CA</country>
+    <zip>K1C2N6</zip>
+    <phone>(555)555-5555</phone>
+  </billingDetails>
+</ccAuthRequestV1>
+    XML
+  end
+
+  def minimal_request
+    <<-XML
+<ccAuthRequestV1 xsi:schemaLocation="http://www.optimalpayments.com/creditcard/xmlschema/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.optimalpayments.com/creditcard/xmlschema/v1">
+  <merchantAccount>
+    <accountNum></accountNum>
+    <storeID>login</storeID>
+    <storePwd>password</storePwd>
+  </merchantAccount>
+  <merchantRefNum>order_id</merchantRefNum>
+  <amount>1.0</amount>
+  <card>
+    <cardNum>4242424242424242</cardNum>
+    <cardExpiry>
+      <month>9</month>
+      <year>2010</year>
+    </cardExpiry>
+    <cardType>VI</cardType>
+  </card>
+  <billingDetails>
+    <cardPayMethod>WEB</cardPayMethod>
+    <zip>K1C2N6</zip>
+  </billingDetails>
+</ccAuthRequestV1>
+    XML
+  end
 
   # Place raw successful response from gateway here
   def successful_purchase_response

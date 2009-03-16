@@ -202,24 +202,31 @@ module ActiveMerchant #:nodoc:
             xml.tag! 'month'      , @credit_card.month
             xml.tag! 'year'       , @credit_card.year
           end
-          xml.tag! 'cardType'     , card_type(@credit_card.type)
-          xml.tag! 'cvdIndicator' , '1' # Value Provided
-          xml.tag! 'cvd'          , @credit_card.verification_value
+          if type = card_type(@credit_card.type)
+            xml.tag! 'cardType'     , type
+          end
+          if @credit_card.verification_value
+            xml.tag! 'cvdIndicator' , '1' # Value Provided
+            xml.tag! 'cvd'          , @credit_card.verification_value
+          end
         end
       end
 
       def build_billing_details(xml, opts)
         xml.tag! 'billingDetails' do
+          addr = opts[:billing_address]
           xml.tag! 'cardPayMethod', 'WEB'
-          xml.tag! 'firstName'    , opts[:billing_address][:name].split(' ').first
-          xml.tag! 'lastName'     , opts[:billing_address][:name].split(' ').last # TODO: parse properly
-          xml.tag! 'street'       , opts[:billing_address][:address1]
-          xml.tag! 'street2'      , opts[:billing_address][:address2]
-          xml.tag! 'city'         , opts[:billing_address][:city]
-          xml.tag! 'state'        , opts[:billing_address][:state]
-          xml.tag! 'country'      , opts[:billing_address][:country]
-          xml.tag! 'zip'          , opts[:billing_address][:zip]
-          xml.tag! 'phone'        , opts[:billing_address][:phone]
+          if addr[:name]
+            xml.tag! 'firstName'    , addr[:name].split(' ').first
+            xml.tag! 'lastName'     , addr[:name].split(' ').last # TODO: parse properly
+          end
+          xml.tag! 'street'       , addr[:address1] if addr[:address1]
+          xml.tag! 'street2'      , addr[:address2] if addr[:address2]
+          xml.tag! 'city'         , addr[:city]     if addr[:city]
+          xml.tag! 'state'        , addr[:state]    if addr[:state]
+          xml.tag! 'country'      , addr[:country]  if addr[:country]
+          xml.tag! 'zip'          , addr[:zip]      # this one's actually required
+          xml.tag! 'phone'        , addr[:phone]    if addr[:phone]
           #xml.tag! 'email'        , ''
         end
       end
