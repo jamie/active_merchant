@@ -33,6 +33,11 @@ module ActiveMerchant #:nodoc:
         commit('ccPurchase', money, options)
       end
 
+      def refund(money, authorization, options = {})
+        options[:confirmationNumber] = authorization
+        commit('ccCredit', money, options)
+      end
+
       def capture(money, authorization, options = {})
         options[:confirmationNumber] = authorization
         commit('ccSettlement', money, options)
