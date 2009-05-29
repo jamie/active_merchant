@@ -76,7 +76,7 @@ class OptimalPaymentTest < Test::Unit::TestCase
     <storeID>login</storeID>
     <storePwd>password</storePwd>
   </merchantAccount>
-  <merchantRefNum>order_id</merchantRefNum>
+  <merchantRefNum>1</merchantRefNum>
   <amount>1.0</amount>
   <card>
     <cardNum>4242424242424242</cardNum>
@@ -112,7 +112,7 @@ class OptimalPaymentTest < Test::Unit::TestCase
     <storeID>login</storeID>
     <storePwd>password</storePwd>
   </merchantAccount>
-  <merchantRefNum>order_id</merchantRefNum>
+  <merchantRefNum>1</merchantRefNum>
   <amount>1.0</amount>
   <card>
     <cardNum>4242424242424242</cardNum>

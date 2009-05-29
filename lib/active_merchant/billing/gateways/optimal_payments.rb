@@ -62,6 +62,8 @@ module ActiveMerchant #:nodoc:
       end
 
       def commit(action, money, post)
+        post[:order_id] ||= 'order_id'
+
         xml = case action
         when 'ccAuthorize', 'ccPurchase', 'ccVerification'
           cc_auth_request(money, post)
@@ -133,7 +135,7 @@ module ActiveMerchant #:nodoc:
       def cc_auth_request(money, opts)
         xml_document('ccAuthRequestV1') do |xml|
           build_merchant_account(xml, @options)
-          xml.merchantRefNum 'order_id'
+          xml.merchantRefNum opts[:order_id]
           xml.amount(money/100.0)
           build_card(xml, opts)
           build_billing_details(xml, opts)
@@ -144,7 +146,7 @@ module ActiveMerchant #:nodoc:
         xml_document('ccPostAuthRequestV1') do |xml|
           build_merchant_account(xml, @options)
           xml.confirmationNumber opts[:confirmationNumber]
-          xml.merchantRefNum 'order_id'
+          xml.merchantRefNum opts[:order_id]
           xml.amount(money/100.0)
         end
       end
@@ -152,7 +154,7 @@ module ActiveMerchant #:nodoc:
       def cc_stored_data_request(money, opts)
         xml_document('ccStoredDataRequestV1') do |xml|
           build_merchant_account(xml, @options)
-          xml.merchantRefNum 'order_id'
+          xml.merchantRefNum opts[:order_id]
           xml.confirmationNumber opts[:confirmationNumber]
           xml.amount(money/100.0)
         end
@@ -170,7 +172,7 @@ module ActiveMerchant #:nodoc:
       # def cc_payment_request(money, opts)
       #   xml_document('ccPaymentRequestV1') do |xml|
       #     build_merchant_account(xml, @options)
-      #     xml.merchantRefNum 'order_id'
+      #     xml.merchantRefNum opts[:order_id]
       #     xml.amount(money/100.0)
       #     build_card(xml, opts)
       #     build_billing_details(xml, opts)
