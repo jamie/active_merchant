@@ -2,7 +2,7 @@ require 'test_helper'
 
 class VindiciaTest < Test::Unit::TestCase
   def setup
-    @gateway = VindiciumGateway.new(
+    @gateway = VindiciaGateway.new(
                  :login => 'login',
                  :password => 'password'
                )
