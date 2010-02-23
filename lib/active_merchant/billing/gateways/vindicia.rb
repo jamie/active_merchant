@@ -34,32 +34,33 @@ module ActiveMerchant #:nodoc:
       end
 
       def authorize(money, creditcard, options = {})
-        post = {}
+        post = options_for_post(options)
         add_account(post, options)
         add_payment_method(post, creditcard, options)
 
         commit('authonly', money, post)
       end
 
-      def purchase(sku, creditcard, options = {})
-        post = {}
+      def purchase(money, creditcard, options = {})
+        post = options_for_post(options)
         add_account(post, options)
         if !success?(post[:account].request_status)
           return error_from(post[:account])
         end
         add_payment_method(post, creditcard, options)
 
-        commit('sale', sku, post)
+        commit('sale', money, post)
       end
 
       def capture(money, authorization, options = {})
+        options[:auth] = authorization
         commit('capture', money, options)
       end
 
       private
 
       def add_account(post, options)
-        if options[:account_vid].blank?
+        if options[:account_id].blank?
           account, created = Vindicia::Account.update({
             :merchantAccountId      => Time.now.to_i.to_s,
             :emailAddress           => options[:email],
@@ -68,14 +69,14 @@ module ActiveMerchant #:nodoc:
           })
           post[:account] = account
         else
-          post[:account] = Vindicia::Account.find_by_vid[:account_vid]
+          post[:account] = Vindicia::Account.find(options[:account_id])
         end
       end
 
       # does both creditcard and address
       def add_payment_method(post, creditcard, options)
         address = options[:billing_address] || options[:shipping_address] || options[:address]
-        account, validated = Vindicia::Account.updatePaymentMethod(post[:account].vid_reference, {
+        post[:account], validated = Vindicia::Account.updatePaymentMethod(post[:account].ref, {
           # Payment Method
           :type => 'CreditCard',
           :creditCard => {
@@ -96,25 +97,52 @@ module ActiveMerchant #:nodoc:
         })
       end
       
-      def commit(action, sku, parameters)
+      def commit(action, money, parameters)
+        # Parameters:
+        # sku
+        # name
+        # transaction_id
+        # account (as a Vindicia::Account)
+        
         account = parameters[:account]
-        product = Vindicia::Product.find_by_merchant_id(sku)
-        billing = Vindicia::BillingPlan.find_by_merchant_id(sku)
-        autobill, created, authstatus, firstBillDate, firstBillAmount, firstBillingCurrency = \
-        Vindicia::AutoBill.update({
-          :account => account.vid_reference,
-          :product => product.vid_reference,
-          :billingPlan => billing.vid_reference
-        })
+        
+        case action
+        when 'sale'
+          payment_vid = account.paymentMethods.first['VID']
+          cap_data = {
+            :account                => account.ref,
+            :merchantTransactionId  => parameters[:order_id],
+            :sourcePaymentMethod    => {:VID => payment_vid},
+            :amount                 => money/100.0,
+            #:currency               => money.currency,
+            :transactionItems       => [{:sku => parameters[:sku], :name => parameters[:name], :price => money/100.0, :quantity => 1}]
+          }
+          transaction = Vindicia::Transaction.authCapture(cap_data)
+        when 'authonly'
+          payment_vid = account.paymentMethods.first['VID']
+          transaction = Vindicia::Transaction.auth({
+            :account                => account.ref,
+            :merchantTransactionId  => parameters[:order_id],
+            :sourcePaymentMethod    => {:VID => payment_vid},
+            :amount                 => money/100.0,
+            #:currency               => money.currency,
+            :transactionItems       => [{:sku => parameters[:sku], :name => parameters[:name], :price => money/100.0, :quantity => 1}]
+          })
+        when 'capture'
+          # WIP
+          transaction = Vindicia::Transaction.new(parameters[:auth])
+          ret, successful, failed, results = Vindicia::Transaction.capture([transaction.ref])
+          transaction = Vindicia::Transaction.find(results[0].merchantTransactionId)
+        end
 
-        response = autobill.values
-        message = message_from(autobill.request_status)
+        response = transaction.values
+        message = message_from(transaction.request_status)
 
         test_mode = Vindicia.environment != :production
 
-        Response.new(success?(autobill.request_status), message, response, 
+        Response.new(success?(transaction.request_status), message, response, 
           :test => test_mode, 
-          :authorization => response["VID"]
+          :authorization => response['merchantTransactionId']
         )
       end
       
@@ -127,6 +155,12 @@ module ActiveMerchant #:nodoc:
         message = message_from(soap_object.request_status)
         test_mode = Vindicia.environment != :production
         Response.new(false, message, response, :test => test_mode)
+      end
+      
+      def options_for_post(options)
+        { :name => options[:name],
+          :sku => options[:sku]
+        }
       end
       
       def success?(request)
