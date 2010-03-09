@@ -6,7 +6,7 @@ class RemoteVindiciaTest < Test::Unit::TestCase
 
     @amount = 4900
     @credit_card = credit_card('4485983356242217')
-    @declined_card = credit_card('4555555555555550')
+    @declined_card = credit_card('4485983356242216')
 
     @options = {
       :name => "Premium Subscription",
@@ -23,7 +23,7 @@ class RemoteVindiciaTest < Test::Unit::TestCase
     assert_equal 'OK', response.message
   end
 
-  def xtest_unsuccessful_purchase
+  def test_unsuccessful_purchase
     @options[:sku] = ""
     # TODO: remove above line and figure out cc # that will fail properly
     assert response = @gateway.purchase(@amount, @declined_card, @options)
@@ -40,7 +40,7 @@ class RemoteVindiciaTest < Test::Unit::TestCase
     assert_success capture
   end
 
-  def xtest_failed_capture
+  def test_failed_capture
     assert response = @gateway.capture(@amount, '')
     assert_failure response
     assert_match /Unable to save AutoBill/, response.message
