@@ -1,4 +1,5 @@
 require 'test_helper'
+require 'pp'
 
 class RemoteVindiciaTest < Test::Unit::TestCase
   def setup
@@ -24,26 +25,28 @@ class RemoteVindiciaTest < Test::Unit::TestCase
   end
 
   def test_unsuccessful_purchase
-    @options[:sku] = ""
-    # TODO: remove above line and figure out cc # that will fail properly
     assert response = @gateway.purchase(@amount, @declined_card, @options)
     assert_failure response
-    assert_equal 'Unable to create autobill:  Payment method validation failed.', response.message
+    assert_equal 'Could not validate card', response.message
   end
-
-  def test_authorize_and_capture
+  
+  def test_authorize
     assert auth = @gateway.authorize(@amount, @credit_card, @options)
     assert_success auth
     assert_equal 'OK', auth.message
     assert auth.authorization
-    assert capture = @gateway.capture(@amount, auth.authorization)
+  end
+
+  def test_capture
+    assert response = @gateway.authorize(@amount, @credit_card, @options)
+    assert capture = @gateway.capture(@amount, response.authorization)
     assert_success capture
   end
 
   def test_failed_capture
     assert response = @gateway.capture(@amount, '')
     assert_failure response
-    assert_match /Unable to save AutoBill/, response.message
+    assert_match 'Capture failed', response.message
   end
 
   def test_invalid_login

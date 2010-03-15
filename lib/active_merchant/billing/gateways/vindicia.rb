@@ -33,30 +33,21 @@ module ActiveMerchant #:nodoc:
         super
       end
 
-      def authorize(money, creditcard, options = {})
-        post = options_for_post(options)
-        add_account(post, options)
-        add_payment_method(post, creditcard, options)
-
-        do_auth(money, post)
+      def purchase(money, creditcard, options = {})
+        response = authorize(money, creditcard, options)
+        return response unless response.success?
+        
+        capture(money, response.authorization)
       end
 
-      def purchase(money, creditcard, options = {})
+      def authorize(money, creditcard, options = {})
         post = options_for_post(options)
-        add_account(post, options)
-        if !success?(post[:account].request_status)
+        add_account(post, creditcard, options)
+        add_payment_method(post, creditcard, options) if ok?(post[:account])
+        if post[:validated]
+          do_auth(money, post)
+        else
           return error_from(post[:account])
-        end
-        
-        add_payment_method(post, creditcard, options)
-        if !post[:valid]
-          return error_from(post[:account])
-        end
-
-        t = do_auth(money, post)
-        if t.success?
-          auth = t.authorization
-          do_capture(money, auth)
         end
       end
 
@@ -64,26 +55,24 @@ module ActiveMerchant #:nodoc:
         do_capture(money, authorization)
       end
 
-      private
-
-      def add_account(post, options)
-        if options[:account_id].blank?
-          account, created = Vindicia::Account.update({
+    private
+      def add_account(post, creditcard, options)
+        post[:account], post[:created] = if options[:account_id].blank?
+          Vindicia::Account.update({
             :merchantAccountId      => Time.now.to_i.to_s,
             :emailAddress           => options[:email],
             :warnBeforeAutobilling  => false,
-            :name                   => 'Integration User'
+            :name                   => [creditcard.first_name, creditcard.last_name].join(" ")
           })
-          post[:account] = account
         else
-          post[:account] = Vindicia::Account.find(options[:account_id])
+          Vindicia::Account.find(options[:account_id])
         end
       end
 
-      # does both creditcard and address
       def add_payment_method(post, creditcard, options)
         address = options[:billing_address] || options[:shipping_address] || options[:address]
-        post[:account], post[:valid] = Vindicia::Account.updatePaymentMethod(post[:account].ref, {
+
+        post[:account], post[:validated] = Vindicia::Account.updatePaymentMethod(post[:account].ref, {
           # Payment Method
           :type => 'CreditCard',
           :creditCard => {
@@ -91,7 +80,7 @@ module ActiveMerchant #:nodoc:
             :expirationDate => expdate(creditcard),
             # creditcard.verification_value ??
           },
-          :accountHolderName => 'John Smith',
+          :accountHolderName => [creditcard.first_name, creditcard.last_name].join(" "),
           :billingAddress => {
             :name => [creditcard.first_name, creditcard.last_name].join(" "),
             :addr1 => address[:address1].to_s,
@@ -101,13 +90,14 @@ module ActiveMerchant #:nodoc:
             :postalCode => address[:zip].to_s
           },
           :merchantPaymentMethodId => options[:order_id]
-        })
+        }, true, 'Validate')
+        @failure = "Could not validate card" if post[:validated] == false
       end
       
       
       def do_auth(money, parameters)
         account = parameters[:account]
-        payment_vid = account.paymentMethods.first['VID']
+        payment_vid = account.paymentMethods.first.VID
         transaction = Vindicia::Transaction.auth({
           :account                => account.ref,
           :merchantTransactionId  => parameters[:order_id],
@@ -123,14 +113,13 @@ module ActiveMerchant #:nodoc:
         transaction = Vindicia::Transaction.new(auth)
         ret, successful, failed, results = Vindicia::Transaction.capture([transaction.ref])
         transaction = Vindicia::Transaction.find(results[0].merchantTransactionId)
+        @failure = "Capture failed" if successful.zero?
         response_for(transaction)
       end
       
       def response_for(transaction)
         response = transaction.values
         message = message_from(transaction.request_status)
-
-        test_mode = Vindicia.environment != :production
 
         Response.new(success?(transaction.request_status), message, response, 
           :test => test_mode, 
@@ -139,7 +128,8 @@ module ActiveMerchant #:nodoc:
       end
       
       def message_from(request)
-        request.response
+        msg = @failure if request.code == 200 or request.response =~ /\(Internal\)/
+        msg ||= request.response
       end
       
       def error_from(soap_object)
@@ -156,12 +146,20 @@ module ActiveMerchant #:nodoc:
       end
       
       def success?(request)
-        request.code == 200
+        @failure.nil? && request.code == 200
       end
       
     private
       def expdate(creditcard)
         "%4d%02d" % [creditcard.year, creditcard.month]
+      end
+      
+      def ok?(response)
+        response.request_status.code == 200
+      end
+
+      def test_mode
+        Vindicia.environment != :production
       end
 
     end
