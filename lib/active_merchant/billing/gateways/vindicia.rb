@@ -141,7 +141,8 @@ module ActiveMerchant #:nodoc:
       
       def options_for_post(options)
         { :name => options[:name],
-          :sku => options[:sku]
+          :sku => options[:sku],
+          :order_id => options[:order_id]
         }
       end
       
