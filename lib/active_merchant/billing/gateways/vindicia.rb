@@ -27,9 +27,9 @@ module ActiveMerchant #:nodoc:
           raise
         end
         
-        #requires!(options, :login, :password)
+        #requires!(options, :login, :password, :env)
         @options = options
-        Vindicia.authenticate(options[:login], options[:password])
+        Vindicia.authenticate(options[:login], options[:password], options[:env]||:prodtest)
         super
       end
 
@@ -56,17 +56,18 @@ module ActiveMerchant #:nodoc:
       end
 
     private
+      def name_on(creditcard)
+        [creditcard.first_name, creditcard.last_name].join(" ")
+      end
+    
       def add_account(post, creditcard, options)
-        post[:account], post[:created] = if options[:account_id].blank?
-          Vindicia::Account.update({
-            :merchantAccountId      => Time.now.to_i.to_s,
-            :emailAddress           => options[:email],
-            :warnBeforeAutobilling  => false,
-            :name                   => [creditcard.first_name, creditcard.last_name].join(" ")
-          })
-        else
-          Vindicia::Account.find(options[:account_id])
-        end
+        post[:account], post[:created] = Vindicia::Account.update({
+          # TODO: should be passed in, em-id
+          :merchantAccountId      => Time.now.to_i.to_s,
+          :emailAddress           => options[:email],
+          :warnBeforeAutobilling  => false,
+          :name                   => name_on(creditcard)
+        })
       end
 
       def add_payment_method(post, creditcard, options)
@@ -76,21 +77,22 @@ module ActiveMerchant #:nodoc:
           # Payment Method
           :type => 'CreditCard',
           :creditCard => {
-            :account => creditcard.number,
+            :account        => creditcard.number,
             :expirationDate => expdate(creditcard),
             # creditcard.verification_value ??
           },
-          :accountHolderName => [creditcard.first_name, creditcard.last_name].join(" "),
+          :accountHolderName => name_on(creditcard),
           :billingAddress => {
-            :name => [creditcard.first_name, creditcard.last_name].join(" "),
-            :addr1 => address[:address1].to_s,
-            :city => address[:city].to_s,
-            :district => address[:state].to_s,
-            :country => address[:country].to_s,
+            :name       => name_on(creditcard),
+            :addr1      => address[:address1].to_s,
+            :city       => address[:city].to_s,
+            :district   => address[:state].to_s,
+            :country    => address[:country].to_s,
             :postalCode => address[:zip].to_s
           },
           :merchantPaymentMethodId => options[:order_id]
-        }, true, 'Validate')
+        }, true, 'Validate', 0)
+        # TODO : fail for certain error codes
         @failure = "Could not validate card" if post[:validated] == false
       end
       
@@ -105,7 +107,7 @@ module ActiveMerchant #:nodoc:
           :amount                 => money/100.0,
           #:currency               => money.currency,
           :transactionItems       => [{:sku => parameters[:sku], :name => parameters[:name], :price => money/100.0, :quantity => 1}]
-        })
+        }, 100, false)
         response_for(transaction)
       end
       
@@ -150,7 +152,7 @@ module ActiveMerchant #:nodoc:
         @failure.nil? && request.code == 200
       end
       
-    private
+
       def expdate(creditcard)
         "%4d%02d" % [creditcard.year, creditcard.month]
       end
