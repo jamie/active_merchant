@@ -29,7 +29,14 @@ class RemoteVindiciaTest < Test::Unit::TestCase
     assert_failure response
     assert_equal 'Could not validate card', response.message
   end
-  
+
+  def test_purchase_needing_moderation
+    assert response = @gateway.purchase(@amount, credit_card('5135299256640694'), @options)
+    assert_failure response
+    assert response.fraud_review?
+    assert_equal 'AVS/CVN triggered fraud review', response.message
+  end
+
   def test_authorize
     assert auth = @gateway.authorize(@amount, @credit_card, @options)
     assert_success auth
@@ -43,6 +50,18 @@ class RemoteVindiciaTest < Test::Unit::TestCase
     assert_success capture
   end
 
+  def test_capture_after_fraud_review
+    assert response = @gateway.purchase(@amount, credit_card('5135299256640694'), @options)
+    assert_failure response
+    assert response.fraud_review?
+    assert_equal 'AVS/CVN triggered fraud review', response.message
+
+    # Don't use the same gateway instance for multiple requests, it bleeds error messages
+    @gateway = VindiciaGateway.new(fixtures(:vindicia))
+    assert capture = @gateway.capture(@amount, response.authorization)
+    assert_success capture
+  end
+
   def test_failed_capture
     assert response = @gateway.capture(@amount, '')
     assert_failure response
@@ -50,10 +69,7 @@ class RemoteVindiciaTest < Test::Unit::TestCase
   end
 
   def test_invalid_login
-    gateway = VindiciaGateway.new(
-                :login => '',
-                :password => ''
-              )
+    gateway = VindiciaGateway.new(:login => '', :password => '')
     assert response = gateway.purchase(@amount, @credit_card, @options)
     assert_failure response
     assert_equal 'Permission denied to domain "soap"', response.message
