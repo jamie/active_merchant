@@ -157,7 +157,7 @@ module ActiveMerchant #:nodoc:
       end
       
       def response_for(transaction, review=false)
-        response = transaction.values
+        response = transaction.to_hash
         message = message_from(transaction.request_status)
 
         Response.new(success?(transaction.request_status), message, response, 
@@ -173,7 +173,7 @@ module ActiveMerchant #:nodoc:
       end
       
       def error_from(soap_object)
-        response = soap_object.values
+        response = soap_object.to_hash
         message = message_from(soap_object.request_status)
         test_mode = Vindicia.environment != :production
         Response.new(false, message, response, :test => test_mode)
