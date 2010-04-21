@@ -26,7 +26,7 @@ module ActiveMerchant #:nodoc:
           puts "The vindicia gem must be installed to use this gateway."
           raise
         end
-        
+
         #requires!(options, :login, :password, :env)
         configure(options)
         @options = options
@@ -51,7 +51,7 @@ module ActiveMerchant #:nodoc:
         response = authorize(money, creditcard, options)
         return response unless response.success?
         return response if response.fraud_review?
-        
+
         capture(money, response.authorization)
       end
 
@@ -70,7 +70,7 @@ module ActiveMerchant #:nodoc:
       def name_on(creditcard)
         [creditcard.first_name, creditcard.last_name].join(" ")
       end
-    
+
       def add_account(post, creditcard, options)
         post[:account] = {
           # TODO: should be passed in, em-id
@@ -136,7 +136,7 @@ module ActiveMerchant #:nodoc:
           response_for(transaction)
         end
       end
-      
+
       def do_capture(money, auth)
         transaction = Vindicia::Transaction.new(auth)
         ret, successful, failed, results = Vindicia::Transaction.capture([transaction.ref])
@@ -144,23 +144,23 @@ module ActiveMerchant #:nodoc:
         @failure = "Capture failed" if successful.zero?
         response_for(transaction)
       end
-      
+
       def response_for(transaction, review=false)
         response = transaction.to_hash
         message = message_from(transaction.request_status)
 
-        Response.new(success?(transaction.request_status), message, response, 
+        Response.new(success?(transaction.request_status), message, response,
           :test => test_mode,
           :fraud_review => review,
           :authorization => response['merchantTransactionId']
         )
       end
-      
+
       def message_from(request)
         msg = @failure if request.code == 200 or request.response =~ /\(Internal\)/
         msg ||= request.response
       end
-      
+
       def error_from(soap_object)
         response = soap_object.to_hash
         message = message_from(soap_object.request_status)
@@ -171,12 +171,12 @@ module ActiveMerchant #:nodoc:
       def success?(request)
         @failure.nil? && request.code == 200
       end
-      
+
 
       def expdate(creditcard)
         "%4d%02d" % [creditcard.year, creditcard.month]
       end
-      
+
       def ok?(response)
         response.request_status.code == 200
       end
@@ -188,4 +188,3 @@ module ActiveMerchant #:nodoc:
     end
   end
 end
-
