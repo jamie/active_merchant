@@ -107,6 +107,7 @@ module ActiveMerchant #:nodoc:
 
 
       def do_auth(money, post, options)
+        post[:nameValues] = options[:name_values] if options[:name_values]
         transaction = Vindicia::Transaction.auth(post.merge({
           :merchantTransactionId  => options[:order_id],
           :amount                 => money/100.0,
