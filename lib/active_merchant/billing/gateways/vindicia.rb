@@ -56,14 +56,10 @@ module ActiveMerchant #:nodoc:
       end
 
       def authorize(money, creditcard, options = {})
-        post = options_for_post(options)
+        post = {}
         add_account(post, creditcard, options)
-        add_payment_method(post, creditcard, options) if ok?(post[:account])
-        if post[:validated]
-          do_auth(money, post)
-        else
-          return error_from(post[:account])
-        end
+        add_payment_method(post, creditcard, options)
+        do_auth(money, post, options)
       end
 
       def capture(money, authorization, options = {})
@@ -76,19 +72,19 @@ module ActiveMerchant #:nodoc:
       end
     
       def add_account(post, creditcard, options)
-        post[:account], post[:created] = Vindicia::Account.update({
+        post[:account] = {
           # TODO: should be passed in, em-id
           :merchantAccountId      => Time.now.to_i.to_s,
           :emailAddress           => options[:email],
           :warnBeforeAutobilling  => false,
           :name                   => name_on(creditcard)
-        })
+        }
       end
 
       def add_payment_method(post, creditcard, options)
         address = options[:billing_address] || options[:shipping_address] || options[:address]
 
-        post[:account], post[:validated] = Vindicia::Account.updatePaymentMethod(post[:account].ref, {
+        post[:sourcePaymentMethod] = {
           # Payment Method
           :type => 'CreditCard',
           :creditCard => {
@@ -106,24 +102,17 @@ module ActiveMerchant #:nodoc:
             :postalCode => address[:zip].to_s
           },
           :merchantPaymentMethodId => options[:order_id]
-        }, true, 'Validate', 0)
-        # TODO : fail for certain error codes
-        @failure = "Could not validate card" if post[:validated] == false
+        }
       end
-      
-      
-      def do_auth(money, parameters)
-        account = parameters[:account]
-        payment_vid = account.paymentMethods.first.VID
-        transaction = Vindicia::Transaction.auth({
-          :account                => account.ref,
-          :merchantTransactionId  => parameters[:order_id],
-          :sourcePaymentMethod    => {:VID => payment_vid},
+
+
+      def do_auth(money, post, options)
+        transaction = Vindicia::Transaction.auth(post.merge({
+          :merchantTransactionId  => options[:order_id],
           :amount                 => money/100.0,
           #:currency               => money.currency,
-          :transactionItems       => [{:sku => parameters[:sku], :name => parameters[:name], :price => money/100.0, :quantity => 1}]
-        }, @risk_fail, false)
-
+          :transactionItems       => [{:sku => options[:sku], :name => options[:name], :price => money/100.0, :quantity => 1}]
+        }), @risk_fail, false)
         if auth_log = transaction.statusLog.detect{|log|log.status == 'Authorized'}
           avs_code = auth_log.creditCardStatus.avsCode
           cvn_code = auth_log.creditCardStatus.cvnCode
@@ -178,14 +167,7 @@ module ActiveMerchant #:nodoc:
         test_mode = Vindicia.environment != :production
         Response.new(false, message, response, :test => test_mode)
       end
-      
-      def options_for_post(options)
-        { :name => options[:name],
-          :sku => options[:sku],
-          :order_id => options[:order_id]
-        }
-      end
-      
+
       def success?(request)
         @failure.nil? && request.code == 200
       end
