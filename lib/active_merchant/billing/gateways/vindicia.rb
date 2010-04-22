@@ -101,6 +101,7 @@ module ActiveMerchant #:nodoc:
             :country    => address[:country].to_s,
             :postalCode => address[:zip].to_s
           },
+          :nameValues => [{:name => 'CVN', :value => creditcard.cvv}],
           :merchantPaymentMethodId => options[:order_id]
         }
       end
