@@ -28,18 +28,17 @@ module ActiveMerchant #:nodoc:
         end
 
         #requires!(options, :login, :password, :env)
-        configure(options)
         @options = options
         Vindicia.authenticate(options[:login], options[:password], options[:env]||:prodtest)
         super
       end
 
-      def configure(options)
+      def configure_risk(options)
         @risk_fail = options[:risk_fail] || 100
         @risk_moderate = options[:risk_moderate] || 100
 
-        @cvn_fail = options[:avs_fail] || ['N', 'P', 'S']
-        @cvn_moderate = options[:avs_moderate] || ['U', '']
+        @cvn_fail = options[:cvn_fail] || ['N', 'P', 'S']
+        @cvn_moderate = options[:cvn_moderate] || ['U', '']
         #@cvv_approve = ['M']
 
         @avs_fail = options[:avs_fail] || ['N', 'C', 'E']
@@ -49,8 +48,7 @@ module ActiveMerchant #:nodoc:
 
       def purchase(money, creditcard, options = {})
         response = authorize(money, creditcard, options)
-        return response unless response.success?
-        return response if response.fraud_review?
+        return response if response.fraud_review? or !response.success?
 
         capture(money, response.authorization)
       end
@@ -108,6 +106,8 @@ module ActiveMerchant #:nodoc:
 
 
       def do_auth(money, post, options)
+        configure_risk(options)
+
         post[:nameValues] = options[:name_values] if options[:name_values]
         transaction = Vindicia::Transaction.auth(post.merge({
           :merchantTransactionId  => options[:order_id],
