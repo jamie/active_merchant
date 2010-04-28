@@ -72,7 +72,7 @@ module ActiveMerchant #:nodoc:
       def add_account(post, creditcard, options)
         post[:account] = {
           # TODO: should be passed in, em-id
-          :merchantAccountId      => Time.now.to_i.to_s,
+          :merchantAccountId      => options[:account_id],
           :emailAddress           => options[:email],
           :warnBeforeAutobilling  => false,
           :name                   => name_on(creditcard)
