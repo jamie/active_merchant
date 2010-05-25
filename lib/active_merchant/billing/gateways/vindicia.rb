@@ -54,10 +54,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def authorize(money, creditcard, options = {})
-        post = {}
-        add_account(post, creditcard, options)
-        add_payment_method(post, creditcard, options)
-        do_auth(money, post, options)
+        do_auth(money, creditcard, options)
       end
 
       def capture(money, authorization, options = {})
@@ -69,7 +66,18 @@ module ActiveMerchant #:nodoc:
         [creditcard.first_name, creditcard.last_name].join(" ")
       end
 
-      def add_account(post, creditcard, options)
+      def do_auth(money, creditcard, options)
+        address = options[:billing_address] || options[:shipping_address] || options[:address]
+        address_hash = {
+          :name       => name_on(creditcard),
+          :addr1      => address[:address1].to_s,
+          :city       => address[:city].to_s,
+          :district   => address[:state].to_s,
+          :country    => address[:country].to_s,
+          :postalCode => address[:zip].to_s
+        }
+
+        post = {}
         post[:account] = {
           # TODO: should be passed in, em-id
           :merchantAccountId      => options[:account_id],
@@ -77,10 +85,6 @@ module ActiveMerchant #:nodoc:
           :warnBeforeAutobilling  => false,
           :name                   => name_on(creditcard)
         }
-      end
-
-      def add_payment_method(post, creditcard, options)
-        address = options[:billing_address] || options[:shipping_address] || options[:address]
 
         post[:sourcePaymentMethod] = {
           # Payment Method
@@ -91,28 +95,19 @@ module ActiveMerchant #:nodoc:
             # creditcard.verification_value ??
           },
           :accountHolderName => name_on(creditcard),
-          :billingAddress => {
-            :name       => name_on(creditcard),
-            :addr1      => address[:address1].to_s,
-            :city       => address[:city].to_s,
-            :district   => address[:state].to_s,
-            :country    => address[:country].to_s,
-            :postalCode => address[:zip].to_s
-          },
+          :billingAddress => address_hash,
           :nameValues => [{:name => 'CVN', :value => creditcard.verification_value}],
           :merchantPaymentMethodId => options[:order_id]
         }
-      end
 
-
-      def do_auth(money, post, options)
         configure_risk(options)
 
         post[:nameValues] = options[:name_values] if options[:name_values]
         transaction = Vindicia::Transaction.auth(post.merge({
           :merchantTransactionId  => options[:order_id],
           :amount                 => money/100.0,
-          #:currency               => money.currency,
+          :currency               => options[:currency] || 'USD',
+          :shippingAddress        => address_hash,
           :transactionItems       => [{:sku => options[:sku], :name => options[:name], :price => money/100.0, :quantity => 1}]
         }), @risk_fail, false)
         if auth_log = transaction.statusLog.detect{|log|log.status == 'Authorized'}
