@@ -109,7 +109,7 @@ module ActiveMerchant #:nodoc:
           :currency               => options[:currency] || 'USD',
           :shippingAddress        => address_hash,
           :sourceIp               => options[:ip] || "",
-          :transactionItems       => [{:sku => options[:sku], :name => options[:name], :price => money/100.0, :quantity => 1}]
+          :transactionItems       => [{:sku => options[:sku], :name => options[:name], :price => money/100.0, :quantity => 1, :taxClassification => (options[:tax_classification] || "Service")}]
         }), @risk_fail, false)
         if auth_log = transaction.statusLog.detect{|log|log.status == 'Authorized'}
           avs_code = auth_log.creditCardStatus.avsCode
