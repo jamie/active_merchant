@@ -111,27 +111,38 @@ module ActiveMerchant #:nodoc:
           :sourceIp               => options[:ip] || "",
           :transactionItems       => [{:sku => options[:sku], :name => options[:name], :price => money/100.0, :quantity => 1, :taxClassification => (options[:tax_classification] || "Service")}]
         }), @risk_fail, false)
-        if auth_log = transaction.statusLog.detect{|log|log.status == 'Authorized'}
-          avs_code = auth_log.creditCardStatus.avsCode
-          cvn_code = auth_log.creditCardStatus.cvnCode
-        else
-          # no Auth log entry, so fail normally
-          avs_code = cvn_code = []
-        end
+        
+        if transaction.request_status.returnCode == "200"
+          if auth_log = transaction.statusLog.detect{|log|log.status == 'Authorized'}
+            avs_code = auth_log.creditCardStatus.avsCode
+            cvn_code = auth_log.creditCardStatus.cvnCode
+          else
+            # no Auth log entry, so fail normally
+            avs_code = cvn_code = []
+          end
 
-        if @cvn_fail.include? cvn_code
-          @failure = "CVN check failed"
-          Vindicia::Transaction.cancel([transaction.ref])
-          response_for(transaction)
-        elsif @avs_fail.include? avs_code
-          @failure = "AVS check failed"
-          Vindicia::Transaction.cancel([transaction.ref])
-          response_for(transaction)
-        elsif @cvn_moderate.include? cvn_code or @avs_moderate.include? avs_code
-          @failure = "AVS/CVN triggered fraud review"
-          response_for(transaction, true)
+          if @cvn_fail.include? cvn_code
+            @failure = "CVN check failed"
+            Vindicia::Transaction.cancel([transaction.ref])
+            response_for(transaction)
+          elsif @avs_fail.include? avs_code
+            @failure = "AVS check failed"
+            Vindicia::Transaction.cancel([transaction.ref])
+            response_for(transaction)
+          elsif @cvn_moderate.include? cvn_code or @avs_moderate.include? avs_code
+            @failure = "AVS/CVN triggered fraud review"
+            response_for(transaction, true)
+          else
+            response_for(transaction)
+          end
         else
-          response_for(transaction)
+          response = transaction.to_hash
+          message = message_from(transaction.request_status)
+          Response.new(false, message, response,
+            :test => test_mode,
+            :fraud_review => false,
+            :authorization => ""
+          )
         end
       end
 

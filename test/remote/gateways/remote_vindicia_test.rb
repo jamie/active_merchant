@@ -7,14 +7,17 @@ class RemoteVindiciaTest < Test::Unit::TestCase
 
     @amount = 4900
     @credit_card = credit_card('4485983356242217')
-    @declined_card = credit_card('4485983356242216')
+    @broken_card = credit_card('4485983356242216')
 
     @options = {
       :name => "Premium Subscription",
+      :email => "test@example.com",
       :sku => "PREMIUM_USD",
       :order_id => Time.now.to_i,
+      :account_id => 'test_account',
+      :currency => 'USD',
       :billing_address => address,
-      :description => 'Store Purchase'
+      :description => 'Online Purchase',
     }
   end
 
@@ -25,9 +28,9 @@ class RemoteVindiciaTest < Test::Unit::TestCase
   end
 
   def test_unsuccessful_purchase
-    assert response = @gateway.purchase(@amount, @declined_card, @options)
+    assert response = @gateway.purchase(@amount, @broken_card, @options)
     assert_failure response
-    assert_equal 'Could not validate card', response.message
+    assert_match /Failed to create Payment/, response.message
   end
 
   def test_purchase_needing_moderation
