@@ -54,52 +54,85 @@ module ActiveMerchant #:nodoc:
       end
 
       def authorize(money, creditcard, options = {})
-        do_auth(money, creditcard, options)
+        extract_address!(options, creditcard)
+        post = auth_post(creditcard, options)
+
+        do_auth(money, post, options)
       end
 
       def capture(money, authorization, options = {})
         do_capture(money, authorization)
       end
 
+      def stored_purchase(money, authorization, options = {})
+        # authorization should be the order_id passed in for the previous
+        # transaction.
+        response = stored_authorize(money, authorization, options)
+        return response if response.fraud_review? or !response.success?
+
+        capture(money, response.authorization)
+      end
+
+      def stored_authorize(money, authorization, options = {})
+        # authorization should be the order_id passed in for the previous
+        # transaction.
+        extract_address!(options)
+        post = stored_auth_post(authorization, options)
+
+        do_auth(money, post, options)
+      end
+
+
     private
       def name_on(creditcard)
         [creditcard.first_name, creditcard.last_name].join(" ")
       end
 
-      def do_auth(money, creditcard, options)
+      def extract_address!(options, creditcard=nil)
         address = options[:billing_address] || options[:shipping_address] || options[:address]
-        address_hash = {
-          :name       => name_on(creditcard),
+        options[:address_hash] = {
           :addr1      => address[:address1].to_s,
           :city       => address[:city].to_s,
           :district   => address[:state].to_s,
           :country    => address[:country].to_s,
           :postalCode => address[:zip].to_s
         }
+        options[:address_hash][:name] = name_on(creditcard) if creditcard
+      end
 
-        post = {}
-        post[:account] = {
-          # TODO: should be passed in, em-id
-          :merchantAccountId      => options[:account_id],
-          :emailAddress           => options[:email],
-          :warnBeforeAutobilling  => false,
-          :name                   => name_on(creditcard)
-        }
-
-        post[:sourcePaymentMethod] = {
-          # Payment Method
-          :type => 'CreditCard',
-          :creditCard => {
-            :account        => creditcard.number,
-            :expirationDate => expdate(creditcard),
-            # creditcard.verification_value ??
+      def auth_post(creditcard, options)
+        {
+          :account => {
+            # TODO: should be passed in, em-id
+            :merchantAccountId      => options[:account_id],
+            :emailAddress           => options[:email],
+            :warnBeforeAutobilling  => false,
+            :name                   => name_on(creditcard)
           },
-          :accountHolderName => name_on(creditcard),
-          :billingAddress => address_hash,
-          :nameValues => [{:name => 'CVN', :value => creditcard.verification_value}],
-          :merchantPaymentMethodId => options[:order_id]
-        }
 
+          :sourcePaymentMethod => {
+            # Payment Method
+            :type => 'CreditCard',
+            :creditCard => {
+              :account        => creditcard.number,
+              :expirationDate => expdate(creditcard),
+            },
+            :accountHolderName => name_on(creditcard),
+            :billingAddress => options[:address_hash],
+            :nameValues => [{:name => 'CVN', :value => creditcard.verification_value}],
+            :merchantPaymentMethodId => options[:order_id]
+          }
+        }
+      end
+
+      def stored_auth_post(authorization, options)
+        {
+          :account => {:merchantAccountId => options[:account_id]},
+          :sourcePaymentMethod => {:merchantPaymentMethodId => authorization}
+        }
+      end
+
+      def do_auth(money, post, options)
         configure_risk(options)
 
         post[:nameValues] = options[:name_values] if options[:name_values]
@@ -107,11 +140,11 @@ module ActiveMerchant #:nodoc:
           :merchantTransactionId  => options[:order_id],
           :amount                 => money/100.0,
           :currency               => options[:currency] || 'USD',
-          :shippingAddress        => address_hash,
+          :shippingAddress        => options[:address_hash],
           :sourceIp               => options[:ip] || "",
           :transactionItems       => [{:sku => options[:sku], :name => options[:name], :price => money/100.0, :quantity => 1, :taxClassification => (options[:tax_classification] || "Service")}]
         }), @risk_fail, false)
-        
+
         if transaction.request_status.returnCode == "200"
           if auth_log = transaction.statusLog.detect{|log|log.status == 'Authorized'}
             avs_code = auth_log.creditCardStatus.avsCode
@@ -149,6 +182,7 @@ module ActiveMerchant #:nodoc:
       def do_capture(money, auth)
         transaction = Vindicia::Transaction.new(auth)
         ret, successful, failed, results = Vindicia::Transaction.capture([transaction.ref])
+        # TODO: don't do this next line, check 'results' for info
         transaction = Vindicia::Transaction.find(results[0].merchantTransactionId)
         @failure = "Capture failed" if successful.zero?
         response_for(transaction)

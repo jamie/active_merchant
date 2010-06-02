@@ -9,12 +9,23 @@ class RemoteVindiciaTest < Test::Unit::TestCase
     @credit_card = credit_card('4485983356242217')
     @broken_card = credit_card('4485983356242216')
 
+    unique_me = (Time.now.to_i + Time.now.usec).to_s
+    order_id = unique_me
     @options = {
       :name => "Premium Subscription",
       :email => "test@example.com",
       :sku => "PREMIUM_USD",
-      :order_id => Time.now.to_i,
-      :account_id => 'test_account',
+      :order_id => "order_#{unique_me}",
+      :account_id => "test_account_#{unique_me}",
+      :currency => 'USD',
+      :billing_address => address,
+      :description => 'Online Purchase',
+    }
+    @stored_options = {
+      :name => "Premium Subscription",
+      :sku => "PREMIUM_USD-RE",
+      :order_id => "order_#{unique_me}s",
+      :account_id => "test_account_#{unique_me}",
       :currency => 'USD',
       :billing_address => address,
       :description => 'Online Purchase',
@@ -69,6 +80,38 @@ class RemoteVindiciaTest < Test::Unit::TestCase
     assert response = @gateway.capture(@amount, '')
     assert_failure response
     assert_match 'Capture failed', response.message
+  end
+
+  def test_stored_data_purchase
+    assert response = @gateway.purchase(@amount, @credit_card, @options)
+    assert_success response
+    assert_equal 'OK', response.message
+    assert response.authorization
+
+    # Don't use the same gateway instance for multiple requests, it bleeds error messages
+    @gateway = VindiciaGateway.new(fixtures(:vindicia))
+    assert stored_purchase = @gateway.stored_purchase(@amount, @options[:order_id], @stored_options)
+    assert_success stored_purchase
+  end
+
+  def test_stored_data_authorize_and_capture
+    assert response = @gateway.purchase(@amount, @credit_card, @options)
+    assert_success response
+    assert_equal 'OK', response.message
+    assert response.authorization
+
+    # Don't use the same gateway instance for multiple requests, it bleeds error messages
+    # Also, using @amount*2 and diff options hash so Vindicia doesn't think it's a dupe
+    @gateway = VindiciaGateway.new(fixtures(:vindicia))
+    assert auth = @gateway.stored_authorize(@amount, @options[:order_id], @stored_options)
+    assert_success auth
+    assert_equal 'OK', auth.message
+    assert auth.authorization
+
+    # Don't use the same gateway instance for multiple requests, it bleeds error messages
+    @gateway = VindiciaGateway.new(fixtures(:vindicia))
+    assert capture = @gateway.capture(@amount*2, auth.authorization)
+    assert_success capture
   end
 
   def test_invalid_login
