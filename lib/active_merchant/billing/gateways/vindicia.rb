@@ -90,6 +90,7 @@ module ActiveMerchant #:nodoc:
 
       def extract_address!(options, creditcard=nil)
         address = options[:billing_address] || options[:shipping_address] || options[:address]
+        return if address.nil?
         options[:address_hash] = {
           :addr1      => address[:address1].to_s,
           :city       => address[:city].to_s,
