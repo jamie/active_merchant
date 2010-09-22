@@ -337,7 +337,11 @@ trust_commerce:
 # Working credentials, no need to replace
 usa_epay:
   login: 'yCaWGYQsSVR0S48B6AKMK07RQhaxHvGu'
-  
+
+vindicia:
+  login:
+  password:
+
 # Working credentials, no need to replace
 verify:
   login: 'demo'
