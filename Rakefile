@@ -7,7 +7,7 @@ require 'rake/contrib/rubyforgepublisher'
 require File.join(File.dirname(__FILE__), 'lib', 'support', 'gateway_support')
 
 
-PKG_VERSION = "1.4.2.1"
+PKG_VERSION = "1.4.2.5"
 PKG_NAME = "activemerchant"
 PKG_FILE_NAME = "#{PKG_NAME}-#{PKG_VERSION}"
 
