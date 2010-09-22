@@ -101,12 +101,17 @@ netbilling:
 net_registry:
   login: X
   password: Y
-  
+
 ogone:
   login: LOGIN
   user: USER
   password: PASSWORD
   signature: SIGNATURE
+  
+optimal_payment:
+  login: test
+  password: test
+  account: 'ACCOUNT_NUMBER'
 
 payflow:
   login: LOGIN
