@@ -224,16 +224,16 @@ module ActiveMerchant #:nodoc:
           addr = opts[:billing_address]
           xml.tag! 'cardPayMethod', 'WEB'
           if addr[:name]
-            xml.tag! 'firstName', addr[:name].split(' ').first
-            xml.tag! 'lastName' , addr[:name].split(' ').last # TODO: parse properly
+            xml.tag! 'firstName', CGI.escape(addr[:name].split(' ').first) # TODO: parse properly
+            xml.tag! 'lastName' , CGI.escape(addr[:name].split(' ').last )
           end
-          xml.tag! 'street' , addr[:address1] if addr[:address1] && !addr[:address1].empty?
-          xml.tag! 'street2', addr[:address2] if addr[:address2] && !addr[:address2].empty?
-          xml.tag! 'city'   , addr[:city]     if addr[:city]     && !addr[:city].empty?
-          xml.tag! 'state'  , addr[:state]    if addr[:state]    && !addr[:state].empty?
-          xml.tag! 'country', addr[:country]  if addr[:country]  && !addr[:country].empty?
-          xml.tag! 'zip'    , addr[:zip]      # this one's actually required
-          xml.tag! 'phone'  , addr[:phone]    if addr[:phone]    && !addr[:phone].empty?
+          xml.tag! 'street' , CGI.escape(addr[:address1]) if addr[:address1] && !addr[:address1].empty?
+          xml.tag! 'street2', CGI.escape(addr[:address2]) if addr[:address2] && !addr[:address2].empty?
+          xml.tag! 'city'   , CGI.escape(addr[:city]    ) if addr[:city]     && !addr[:city].empty?
+          xml.tag! 'state'  , CGI.escape(addr[:state]   ) if addr[:state]    && !addr[:state].empty?
+          xml.tag! 'country', CGI.escape(addr[:country] ) if addr[:country]  && !addr[:country].empty?
+          xml.tag! 'zip'    , CGI.escape(addr[:zip]     ) # this one's actually required
+          xml.tag! 'phone'  , CGI.escape(addr[:phone]   ) if addr[:phone]    && !addr[:phone].empty?
           #xml.tag! 'email'        , ''
         end
       end
