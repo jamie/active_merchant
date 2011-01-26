@@ -21,9 +21,9 @@ module ActiveMerchant #:nodoc:
 
       def initialize(options = {})
         begin
-          require 'vindicia'
+          require 'vindicia', '>=0.2.2'
         rescue LoadError
-          puts "The vindicia gem must be installed to use this gateway."
+          puts "The Vindicia ActiveMerchant gateway requires version 0.2.2 or greater of the vindicia gem."
           raise
         end
 
@@ -146,7 +146,7 @@ module ActiveMerchant #:nodoc:
           :transactionItems       => [{:sku => options[:sku], :name => options[:name], :price => money/100.0, :quantity => 1, :taxClassification => (options[:tax_classification] || "Service")}]
         }), @risk_fail, false)
 
-        if transaction.request_status.returnCode == "200"
+        if transaction.request_status.returnCode == 200
           if auth_log = transaction.statusLog.detect{|log|log.status == 'Authorized'}
             avs_code = auth_log.creditCardStatus.avsCode
             cvn_code = auth_log.creditCardStatus.cvnCode
