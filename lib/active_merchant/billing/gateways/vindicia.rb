@@ -196,7 +196,7 @@ module ActiveMerchant #:nodoc:
         Response.new(success?(transaction.request_status), message, response,
           :test => test_mode,
           :fraud_review => review,
-          :authorization => response['merchantTransactionId']
+          :authorization => response['merchant_transaction_id']
         )
       end
 
